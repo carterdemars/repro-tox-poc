@@ -22,7 +22,7 @@ if "messages" not in st.session_state:
         },
         {
             "role": "assistant",
-            "message": "Hello, I'm MedChat, a chatbot built to help you interpret medical literature and support in disease diagnosis."
+            "message": "Hello, I'm a chatbot built to help you query OECD test guidelines."
         },
     ]
 
