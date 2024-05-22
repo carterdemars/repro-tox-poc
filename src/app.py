@@ -1,6 +1,6 @@
 import streamlit as st
 # import cohere
-# from chatbot import MedicalChatBot, SYSTEM_MESSAGE_PROMPT
+from chatbot import ChatBot, SYSTEM_MESSAGE_PROMPT
 
 # # get cohere api key from .env
 # from dotenv import load_dotenv
