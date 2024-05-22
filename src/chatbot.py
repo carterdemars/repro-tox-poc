@@ -114,7 +114,7 @@ class ChatBot:
         
         
         self.vectorstore = Chroma.from_documents(
-            documents=split_documents, embedding=GPT4AllEmbeddings()
+            documents=split_documents, embedding_function=SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2")
         )
 
     def query(self, prompt: str):
