@@ -1,8 +1,13 @@
 from difflib import HtmlDiff
 from fpdf import FPDF
-from langchain.document_loaders import (
-    PyPDFLoader
-)
+# from langchain.document_loaders import (
+#     PyPDFLoader
+# )
+
+from langchain_community.document_loaders import PyPDFLoader
+
+from langchain_community.vectorstores import Chroma
+
 from langchain.agents import Tool, OpenAIFunctionsAgent, AgentExecutor
 from langchain.schema import SystemMessage
 from langchain.prompts import MessagesPlaceholder
@@ -11,7 +16,7 @@ from langchain.text_splitter import (
     CharacterTextSplitter,
 )
 from langchain.embeddings import GPT4AllEmbeddings
-from langchain.vectorstores import Chroma
+#from langchain.vectorstores import Chroma
 from langchain.chains import (
     ConversationalRetrievalChain,
     ReduceDocumentsChain,
@@ -31,33 +36,30 @@ from langchain_community.llms.azureml_endpoint import (
     CustomOpenAIContentFormatter,
 )
 
-URI = None
-KEY = None
+from langchain_community.llms.azureml_endpoint import (
+    AzureMLEndpointApiType
+)
+from langchain_community.chat_models.azureml_endpoint import AzureMLChatOnlineEndpoint, CustomOpenAIChatContentFormatter
+
+URI = 'https://repro-toxicity-mvdiw.eastus2.inference.ml.azure.com/score'
+KEY = 'jAYo2rLdFte9ZF35LanyBXHE9YUW072P'
 MEMORY_KEY = "memory"
 
-
-
-SYSTEM_MESSAGE_PROMPT = """
-You are a chat bot named MedChat, a help agent for medical professionals that answers questions concerning medical conditions and diagnoses. You have access to medical documents with reliable information which you can use to answer questions.
-You are able to answer two types of user questions.
-1. Diagnose brain MRI images
-2. Answer general medical questions using medical literature
-
-Any question that isn't about medicine, or disease diagnoses should not be answered. If a user asks a question that isn't about medicine, you should tell them that you aren't able to help them with their query. Keep your answers concise, and shorter than 5 sentences.
+SYSTEM_MESSAGE_PROMPT = """ You are a chat bot that answers questions about test guidelines. 
 """
 
 class ChatBot:
     """
     Input:
-        pdf_path (str): Path to the PDF file that you want to use for your queries
+        pdf_path (str): Path to the PDF folder that you want to use for your queries
     """
-    def __init__(self, path: str) -> None:
+    def __init__(self, path: str = '') -> None:
         # self.full_document = PyPDFLoader(pdf_path).load()
         # split_documents = RecursiveCharacterTextSplitter(
         #     chunk_size=500, chunk_overlap=0
         # ).split_documents(self.full_document)
 
-        self.load_documents()
+        #self.load_documents()
 
         # self.tools = [
         #     Tool.from_function(
@@ -73,11 +75,11 @@ class ChatBot:
         #     )
         # ]
 
-        self.llm = AzureMLOnlineEndpoint(
+        self.llm = AzureMLChatOnlineEndpoint(
             endpoint_url=URI,
             endpoint_api_type=AzureMLEndpointApiType.dedicated,
             endpoint_api_key=KEY,
-            content_formatter=CustomOpenAIContentFormatter(),
+            content_formatter=CustomOpenAIChatContentFormatter(),
         )
 
         # self.prompt = OpenAIFunctionsAgent.create_prompt(
@@ -94,9 +96,9 @@ class ChatBot:
             output_key="output",
         )
 
-        self.qa_chat = ConversationalRetrievalChain.from_llm(
-            self.llm, retriever=self.vectorstore.as_retriever(), memory=self.memory
-        )
+        # self.qa_chat = ConversationalRetrievalChain.from_llm(
+        #     self.llm, retriever=self.vectorstore.as_retriever(), memory=self.memory
+        # )
 
         # self.agent = OpenAIFunctionsAgent(
         #     llm=self.llm, tools=self.tools, prompt=self.prompt
@@ -111,45 +113,48 @@ class ChatBot:
         # )
 
     def load_documents(self):
-        
+
+        # USE BING'S CHUNKING ALGORITHM
+
+        split_documents = []
         
         self.vectorstore = Chroma.from_documents(
             documents=split_documents, embedding=GPT4AllEmbeddings()
         )
 
-    def query(self, prompt: str):
+    def query(self, message, chat_history, message_placeholder):
         """
         """
-        output = self.agent_executor(
-            f"Use the document to answer the following question: {prompt}"
-        )
+        # output = self.agent_executor(
+        #     f"Use the document to answer the following question: {prompt}"
+        # )
+        response = self.llm.invoke(message)
+        return response
         
-        return output["output"]
-        
 
-class QARetrievalBot:
-    """
-    Bot that handles general questions about the contents of a PDF.
-    Does so using Langchain's ConversationalRetrievalChain, which stores
-    different document parts as embeddings in a vectore store, and performs
-    a similarity search between these embeddings and the user's prompt.
-    See here for more https://python.langchain.com/docs/use_cases/question_answering/
+# class QARetrievalBot:
+#     """
+#     Bot that handles general questions about the contents of a PDF.
+#     Does so using Langchain's ConversationalRetrievalChain, which stores
+#     different document parts as embeddings in a vectore store, and performs
+#     a similarity search between these embeddings and the user's prompt.
+#     See here for more https://python.langchain.com/docs/use_cases/question_answering/
 
-    Input:
-        split_documents (List[Document]): List of document split into its different
-            parts
-    """
-    def __init__(self, split_documents: List[Document]) -> None:
-        self.memory = ConversationBufferMemory(
-            memory_key="chat_history", return_messages=True
-        )
-        self.vectorstore = Chroma.from_documents(
-            documents=split_documents, embedding=GPT4AllEmbeddings()
-        )
-        self.llm = ChatOpenAI(temperature=0, model_name="gpt-3.5-turbo")
-        self.qa_chat = ConversationalRetrievalChain.from_llm(
-            self.llm, retriever=self.vectorstore.as_retriever(), memory=self.memory
-        )
+#     Input:
+#         split_documents (List[Document]): List of document split into its different
+#             parts
+#     """
+#     def __init__(self, split_documents: List[Document]) -> None:
+#         self.memory = ConversationBufferMemory(
+#             memory_key="chat_history", return_messages=True
+#         )
+#         self.vectorstore = Chroma.from_documents(
+#             documents=split_documents, embedding=GPT4AllEmbeddings()
+#         )
+#         self.llm = ChatOpenAI(temperature=0, model_name="gpt-3.5-turbo")
+#         self.qa_chat = ConversationalRetrievalChain.from_llm(
+#             self.llm, retriever=self.vectorstore.as_retriever(), memory=self.memory
+#         )
 
-    def query(self, general_question: str) -> str:
-        return self.qa_chat({"question": general_question})
+#     def query(self, general_question: str) -> str:
+#         return self.qa_chat({"question": general_question})
