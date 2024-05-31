@@ -1,4 +1,4 @@
-from langchain.vectorstores.chroma import Chroma
+from langchain_community.vectorstores.chroma import Chroma
 from langchain_community.embeddings.ollama import OllamaEmbeddings
 from langchain_community.chat_models.azureml_endpoint import AzureMLChatOnlineEndpoint, CustomOpenAIChatContentFormatter
 from langchain_community.llms.azureml_endpoint import AzureMLEndpointApiType
@@ -12,7 +12,18 @@ from langchain_core.runnables import RunnableBranch
 URI = "https://repro-toxicity-xrbuc.eastus2.inference.ml.azure.com/score"
 KEY = "9aIh4YiafyykA1e9okBCiwz6gupwDskX"
 
-SYSTEM_MESSAGE_PROMPT = """ You are a chat bot that answers questions about test guidelines."""
+SYSTEM_MESSAGE_PROMPT = """
+You are a helpful chatbot that answers questions from the perspective of a regulatory toxicologist. 
+You have access to context about guidance documents (GD) and test guidelines (TG) for reproductive toxicology.
+You should answer the user's question in plain and precise language based on the below context.
+
+If the context doesn't contain any relevant information to the question, don't make something up. Instead, just say "I don't have information on that topic":
+
+If applicable, please provide the name of the document where the context originated from.
+<context>
+{context}
+</context>
+        """
 
 chroma_path = "../chroma"
 
@@ -31,23 +42,14 @@ class ChatBot:
             endpoint_api_type=AzureMLEndpointApiType.dedicated,
             endpoint_api_key=KEY,
             content_formatter=CustomOpenAIChatContentFormatter(),
-            model_kwargs={"max_tokens": 512},
+            model_kwargs={"max_tokens": 512, "temperature": 0},
         )
-
-        SYSTEM_TEMPLATE = """
-        Answer the user's questions based on the below context. 
-        If the context doesn't contain any relevant information to the question, don't make something up and just say "I don't know":
-
-        <context>
-        {context}
-        </context>
-        """
 
         question_answering_prompt = ChatPromptTemplate.from_messages(
             [
                 (
                     "system",
-                    SYSTEM_TEMPLATE,
+                    SYSTEM_MESSAGE_PROMPT,
                 ),
                 MessagesPlaceholder(variable_name="messages"),
             ]
