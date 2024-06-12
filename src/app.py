@@ -1,5 +1,5 @@
 import streamlit as st
-from chatbot import ChatBot, SYSTEM_MESSAGE_PROMPT
+from chatbot import OpenAIChatBot, SYSTEM_MESSAGE_PROMPT
 from langchain_core.messages import AIMessage, HumanMessage
 
 # from dotenv import load_dotenv
@@ -17,7 +17,7 @@ for message in st.session_state.messages:
     with st.chat_message(message.type):
         st.markdown(message.content)
 
-st.session_state.bot = ChatBot()
+st.session_state.bot = OpenAIChatBot()
 
 if prompt := st.chat_input("Text here..."):
     with st.chat_message("User"):

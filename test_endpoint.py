@@ -16,3 +16,4 @@ llm = AzureMLOnlineEndpoint(
 
 response = llm.invoke("Will humans ever solve the Collatz conjecture?")
 print(response)
+

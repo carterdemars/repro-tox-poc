@@ -8,9 +8,10 @@ from langchain_core.runnables import RunnablePassthrough
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnableBranch
+from langchain_openai import AzureChatOpenAI
 
-URI = "https://repro-toxicity-xrbuc.eastus2.inference.ml.azure.com/score"
-KEY = "9aIh4YiafyykA1e9okBCiwz6gupwDskX"
+URI = "https://ai-useastsciencegptaihub287254834673.openai.azure.com/openai/deployments/gpt-35-turbo/chat/completions?api-version=2023-03-15-preview"
+KEY = '7eb57e71ebb24b9c8631733c2b353d89'
 
 SYSTEM_MESSAGE_PROMPT = """
 You are a helpful chatbot that answers questions from the perspective of a regulatory toxicologist. 
@@ -44,6 +45,70 @@ class ChatBot:
             content_formatter=CustomOpenAIChatContentFormatter(),
             model_kwargs={"max_tokens": 512, "temperature": 0},
         )
+
+        question_answering_prompt = ChatPromptTemplate.from_messages(
+            [
+                (
+                    "system",
+                    SYSTEM_MESSAGE_PROMPT,
+                ),
+                MessagesPlaceholder(variable_name="messages"),
+            ]
+        )
+
+        document_chain = create_stuff_documents_chain(self.llm, question_answering_prompt)
+
+        query_transform_prompt = ChatPromptTemplate.from_messages(
+            [
+                MessagesPlaceholder(variable_name="messages"),
+                (
+                    "user",
+                    "Given the above conversation, generate a search query to look up in order to get information relevant to the conversation. Only respond with the query, nothing else.",
+                ),
+            ]
+        )
+        
+        query_transforming_retriever_chain = RunnableBranch(
+            (
+                lambda x: len(x.get("messages", [])) == 1,
+                # If only one message, then we just pass that message's content to retriever
+                (lambda x: x["messages"][-1].content) | retriever,
+            ),
+            # If messages, then we pass inputs to LLM chain to transform the query, then pass to retriever
+            query_transform_prompt | self.llm | StrOutputParser() | retriever,
+        ).with_config(run_name="chat_retriever_chain")
+
+        self.conversational_retrieval_chain = RunnablePassthrough.assign(
+            context=query_transforming_retriever_chain,
+        ).assign(
+            answer=document_chain,
+        )
+
+    def query(self, message, chat_history):
+        chat_history.append(HumanMessage(content=message))
+        response = self.conversational_retrieval_chain.invoke({
+            "messages": [
+                HumanMessage(content=message),                
+            ]
+        })
+        return response['answer']
+    
+class OpenAIChatBot:
+    """
+    Input:
+        pdf_path (str): Path to the PDF folder that you want to use for your queries
+    """
+
+    def __init__(self, path: str = '') -> None:
+        vectordb = Chroma(persist_directory=chroma_path, embedding_function = OllamaEmbeddings(model='nomic-embed-text'))
+        retriever = vectordb.as_retriever()
+
+        self.llm = AzureChatOpenAI(
+            openai_api_key='7eb57e71ebb24b9c8631733c2b353d89',
+            openai_api_version="2023-03-15-preview",
+            azure_endpoint="https://ai-useastsciencegptaihub287254834673.openai.azure.com/openai/deployments/gpt-35-turbo/chat/completions?api-version=2023-03-15-preview"
+        )
+    
 
         question_answering_prompt = ChatPromptTemplate.from_messages(
             [
